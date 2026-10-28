@@ -1,12 +1,26 @@
 name: Native Actions on Buildkite
-on: workflow_dispatch
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      cases:
+        description: JSON array of proof cases
+        default: '["alpha", "beta"]'
+        required: true
 permissions:
   contents: read
 jobs:
   prove:
-    name: Native runner proof
+    name: Native runner proof (${{ matrix.case }})
     runs-on: buildkite
     timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        case: ${{ fromJSON(inputs.cases || '["alpha", "beta"]') }}
+    env:
+      DEMO_CASE: ${{ matrix.case }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,6 +44,7 @@ jobs:
           assert.match(e.BUILDKITE_JOB_ID, /^[0-9a-f-]{36}$/);
           assert.match(e.RUNNER_NAME, /^buildkite-r-[0-9a-f]{12}-/);
           const proof = {
+            case: e.DEMO_CASE,
             githubRun: `${e.GITHUB_SERVER_URL}/${e.GITHUB_REPOSITORY}/actions/runs/${e.GITHUB_RUN_ID}`,
             sha: e.GITHUB_SHA, runner: e.RUNNER_NAME, runnerOS: e.RUNNER_OS,
             node: process.version, buildkiteBuild: e.BUILDKITE_BUILD_URL,
@@ -46,6 +61,6 @@ jobs:
           JS
       - uses: actions/upload-artifact@v4
         with:
-          name: native-runner-proof
+          name: native-runner-proof-${{ matrix.case }}
           path: proof.json
           if-no-files-found: error
