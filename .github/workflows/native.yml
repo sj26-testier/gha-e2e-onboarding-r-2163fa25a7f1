@@ -1,0 +1,51 @@
+name: Native Actions on Buildkite
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  prove:
+    name: Native runner proof
+    runs-on: buildkite
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Assert real checkout, action and Buildkite execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$BUILDKITE" = true
+          test "$BUILDKITE_ORGANIZATION_SLUG" = sj26-testier
+          test "$BUILDKITE_AGENT_META_DATA_QUEUE" = linux-small
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(cat fixture.txt)" = 'native-actions-buildkite-proof'
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          assert.equal(process.versions.node.split('.')[0], '22');
+          const e = process.env;
+          assert.match(e.BUILDKITE_JOB_ID, /^[0-9a-f-]{36}$/);
+          assert.match(e.RUNNER_NAME, /^buildkite-r-[0-9a-f]{12}-/);
+          const proof = {
+            githubRun: `${e.GITHUB_SERVER_URL}/${e.GITHUB_REPOSITORY}/actions/runs/${e.GITHUB_RUN_ID}`,
+            sha: e.GITHUB_SHA, runner: e.RUNNER_NAME, runnerOS: e.RUNNER_OS,
+            node: process.version, buildkiteBuild: e.BUILDKITE_BUILD_URL,
+            buildkiteJob: e.BUILDKITE_JOB_ID, buildkiteAgent: e.BUILDKITE_AGENT_ID,
+            queue: e.BUILDKITE_AGENT_META_DATA_QUEUE,
+            checkoutAndActionAndHostAssertions: 'passed'
+          };
+          fs.writeFileSync('proof.json', JSON.stringify(proof, null, 2) + '\n');
+          console.log(JSON.stringify(proof, null, 2));
+          fs.appendFileSync(e.GITHUB_STEP_SUMMARY,
+            `## Native Actions on Buildkite\n\nRunner: \`${proof.runner}\`\n\n` +
+            `[Buildkite hosted job](${proof.buildkiteBuild}#${proof.buildkiteJob})\n\n` +
+            `Checkout, setup-node (${proof.node}) and Buildkite assertions passed.\n`);
+          JS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-runner-proof
+          path: proof.json
+          if-no-files-found: error
