@@ -42,7 +42,7 @@ jobs:
           assert.equal(process.versions.node.split('.')[0], '22');
           const e = process.env;
           assert.match(e.BUILDKITE_JOB_ID, /^[0-9a-f-]{36}$/);
-          assert.match(e.RUNNER_NAME, /^buildkite-r-[0-9a-f]{12}-/);
+          assert.match(e.RUNNER_NAME, /^buildkite-[0-9a-f-]{36}$/);
           const proof = {
             case: e.DEMO_CASE,
             githubRun: `${e.GITHUB_SERVER_URL}/${e.GITHUB_REPOSITORY}/actions/runs/${e.GITHUB_RUN_ID}`,
